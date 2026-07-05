@@ -1,23 +1,43 @@
-import os
-from google import genai
-from dotenv import load_dotenv
+import ollama
 
-load_dotenv()
 
-os.environ["GEMINI_API_KEY"] = os.getenv("GEMINI_API_KEY")
-
-client = genai.Client()
-
-interaction = client.interactions.create(
-    model="gemini-3.5-flash",
-    input="what is the best model in ai.",
-    system_instruction="You are a senior tech expert. Provide very concise, practical answers.",
-    
-    
-    generation_config={
-        "temperature": 0.2,
-        "max_output_tokens": 1000
+messages = [
+    {
+        'role': 'system',
+        'content': 'You are a senior tech expert. Provide very concise, practical answers.'
     }
-)
+]
 
-print(interaction.output_text)
+print("=== Context Window OPEN (Ollama). Type 'exit' to close ===")
+
+
+while True:
+    
+    user_input = input("\nAsk Q: ")
+    
+    
+    if user_input.lower() == 'exit':
+        print("Closing window...")
+        break
+
+    
+    messages.append({'role': 'user', 'content': user_input})
+
+    
+    response = ollama.chat(
+        model='llama3',
+        messages=messages,
+        options={
+            "temperature": 0.9,
+            "num_predict": 1000  
+        }
+    )
+
+   
+    ai_response = response['message']['content']
+    
+    
+    print("\n The A:", ai_response)
+
+    
+    messages.append({'role': 'assistant', 'content': ai_response})
