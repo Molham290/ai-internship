@@ -1,17 +1,18 @@
 import os
 from google import genai
+from dotenv import load_dotenv
 
 
-os.environ["GEMINI_API_KEY"] = "AQ.Ab8RN6I4XHzDk_YW4KVWlDsqerTb429IlvM5DojP3dl9xZv1qw"
+load_dotenv()
+
+
+os.environ["GEMINI_API_KEY"] = os.getenv("GEMINI_API_KEY")
 
 
 client = genai.Client()
-
-
 interaction = client.interactions.create(
-    model="gemini-3.5-flash", 
-    input=" give me the best use of the AI "
+    model="gemini-3.5-flash",
+    input="best use of ai."
 )
-
 
 print(interaction.output_text)
