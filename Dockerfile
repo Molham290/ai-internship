@@ -19,6 +19,6 @@ COPY . /app
 RUN pip install --no-cache-dir ollama
 
 
-CMD bash -c "ollama serve & sleep 5 && python -u Task3_SelfContained.py"
+ENV OLLAMA_HOST=0.0.0.0
 
-CMD ["bash", "-c", "ollama serve & sleep infinity"]
+CMD ["bash", "-c", "ollama serve"]
