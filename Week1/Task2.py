@@ -1,6 +1,6 @@
 import ollama
 
-messages = [{'role': 'system', 'content': 'You are a senior tech expert.'}]
+messages = [{'role': 'system', 'content': 'You are a senior tech expert and expert in convert text to pdf.'}]
 print("=== Fully Self-Contained Docker Window. Type 'exit' to close ===")
 
 while True:
