@@ -17,8 +17,11 @@ while True:
         model='llama3',
         messages=messages,
         options={
-            "temperature": 0.2,
-            "num_predict": 1000
+            'temperature': 0.3,
+            'top_p': 1.0,
+            'top_k': 100,
+            'num_ctx': 1024,
+            'num_thread': 4,          
         }
     )
 
