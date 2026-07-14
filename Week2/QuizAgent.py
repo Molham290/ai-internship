@@ -1,12 +1,13 @@
-import gradio as gr
+import os
 import json
+import gradio as gr
 import ollama
 
 MAX_QUESTIONS = 10
 
 def generate_quiz(num_questions, topic):
     if not topic.strip():
-        return [gr.update(visible=False)] * MAX_QUESTIONS + [None] * MAX_QUESTIONS + ["Please enter a topic."]
+        return [gr.update(visible=False), gr.update(), None] * MAX_QUESTIONS + ["Please enter a topic.", gr.update(visible=False)]
 
     prompt = f"""You are a cybersecurity expert. Create a Security+ certification quiz with exactly {num_questions} multiple-choice questions about '{topic}'.
 Respond ONLY with a valid JSON array. Do not include markdown formatting like ```json.
@@ -15,7 +16,7 @@ The JSON format MUST be exactly:
     {{
         "question": "The question text?",
         "options": ["Option A", "Option B", "Option C", "Option D"],
-        "correct_answer": "Option A",
+        "correct_answer": "The exact string text of the correct option, do NOT write 'Option A' or 'Option B'.",
         "explanation": "Explanation of why this is the correct answer."
     }}
 ]"""
@@ -48,26 +49,30 @@ The JSON format MUST be exactly:
         for i in range(MAX_QUESTIONS):
             if i < len(quiz_data):
                 q = quiz_data[i]
+                updates.append(gr.update(visible=True)) # Group
                 updates.append(gr.update(
-                    visible=True, 
                     choices=q.get("options", []), 
                     label=f"Q{i+1}: {q.get('question', '')}", 
                     value=None
-                ))
-                updates.append(q)
+                )) # Radio
+                updates.append(q) # State
             else:
                 updates.append(gr.update(visible=False))
+                updates.append(gr.update())
                 updates.append(None)
                 
         status = f"✅ Generated {len(quiz_data)} questions about '{topic}'. Select your answers and click Submit!"
-        return updates + [status]
+        return updates + [status, gr.update(visible=True)]
 
     except json.JSONDecodeError:
         err_msg = f"❌ Error: Llama3 did not return valid JSON. Please try again.\n\nRaw response:\n{raw_text}"
-        return [gr.update(visible=False)] * MAX_QUESTIONS + [None] * MAX_QUESTIONS + [err_msg]
+        return [gr.update(visible=False), gr.update(), None] * MAX_QUESTIONS + [err_msg, gr.update(visible=False)]
+    except ollama.ResponseError as e:
+        err_msg = f"❌ Ollama Model Error: {e.error}\n\nPlease ensure the 'llama3' model is pulled by running `ollama pull llama3` in your terminal."
+        return [gr.update(visible=False), gr.update(), None] * MAX_QUESTIONS + [err_msg, gr.update(visible=False)]
     except Exception as e:
-        err_msg = f"❌ Error connecting to Ollama: {str(e)}\n\nPlease ensure Ollama is running locally and the 'llama3' model is pulled (`ollama run llama3`)."
-        return [gr.update(visible=False)] * MAX_QUESTIONS + [None] * MAX_QUESTIONS + [err_msg]
+        err_msg = f"❌ Connection Error: Could not connect to the local Ollama service.\n\nDetails: {str(e)}\n\nSteps to fix:\n1. Ensure Ollama is installed and running locally.\n2. Verify the Ollama server is active (default URL: http://localhost:11434).\n3. Try running `ollama run llama3` in your terminal."
+        return [gr.update(visible=False), gr.update(), None] * MAX_QUESTIONS + [err_msg, gr.update(visible=False)]
 
 def grade_quiz(*args):
     radios = args[:MAX_QUESTIONS]
@@ -97,50 +102,145 @@ def grade_quiz(*args):
     return final_score
 
 # Gradio Interface
-with gr.Blocks(theme=gr.themes.Soft(), title="Security+ Quick Quiz") as demo:
-    gr.Markdown(
-        """
-        # 🛡️ Security+ Quick Quiz Generator
-        Generate custom multiple-choice questions for the CompTIA Security+ exam using local AI (Llama3).
-        """
-    )
-    
-    with gr.Row():
-        with gr.Column(scale=2):
-            topic_input = gr.Textbox(
-                label="Quiz Topic", 
-                placeholder="e.g., Cryptography, Network Firewalls, Malware types...",
-                lines=1
-            )
-        with gr.Column(scale=1):
-            num_questions_input = gr.Slider(
-                minimum=1, maximum=10, step=1, value=5, 
-                label="Number of Questions"
-            )
-            
-    generate_btn = gr.Button("🚀 Generate Quiz", variant="primary")
-    status_output = gr.Markdown()
-    
-    # Dynamically create radio buttons and state holders (hidden by default)
-    radio_components = []
-    state_components = []
-    
-    with gr.Column() as quiz_container:
-        for i in range(MAX_QUESTIONS):
-            r = gr.Radio(visible=False)
-            s = gr.State()
-            radio_components.append(r)
-            state_components.append(s)
-            
-    submit_btn = gr.Button("✅ Submit Answers", variant="secondary")
-    results_output = gr.Markdown()
+custom_css = """
+.container { max-width: 1000px; margin: auto; padding-top: 3rem; padding-bottom: 3rem; }
+.header-text { text-align: center; margin-bottom: 3rem; }
+.header-text h1 { 
+    color: #06b6d4; 
+    font-weight: 900; 
+    font-size: 2.8rem; 
+    margin-bottom: 0.5rem; 
+    text-transform: uppercase; 
+    letter-spacing: 0.05em;
+    text-shadow: 0 0 15px rgba(6, 182, 212, 0.5);
+}
+.header-text p { color: #94a3b8; font-size: 1.15rem; letter-spacing: 0.02em; }
+.panel-custom { padding: 2rem !important; border-radius: 1rem !important; }
+
+/* Question Card Styles */
+.question-card {
+    background-color: #1e293b !important;
+    border: 1px solid #334155 !important;
+    border-radius: 12px !important;
+    padding: 24px !important;
+    margin-bottom: 24px !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+}
+
+.question-radio {
+    border: none !important;
+    background: transparent !important;
+}
+
+.question-radio > label > span {
+    font-size: 1.35rem !important;
+    font-weight: 800 !important;
+    color: #e2e8f0 !important;
+    margin-bottom: 16px !important;
+    display: block !important;
+    line-height: 1.4 !important;
+}
+
+.question-radio .wrap {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+}
+
+.question-radio .wrap label {
+    background: #0f172a !important;
+    padding: 14px 18px !important;
+    border-radius: 8px !important;
+    border: 1px solid #334155 !important;
+    transition: all 0.2s ease !important;
+    cursor: pointer !important;
+}
+
+.question-radio .wrap label:hover {
+    border-color: #06b6d4 !important;
+    background: #164e63 !important;
+}
+
+/* Premium Button Styles */
+button.premium-btn {
+    background: #0891b2 !important; /* solid cybersecurity cyan */
+    border: none !important;
+    border-radius: 8px !important;
+    color: #ffffff !important;
+    font-weight: bold !important;
+    font-size: 1.15rem !important;
+    box-shadow: 0 0 15px rgba(8, 145, 178, 0.4) !important;
+    transition: all 0.3s ease !important;
+}
+
+button.premium-btn:hover {
+    background: #06b6d4 !important; /* brighter glow */
+    transform: scale(1.02) !important;
+    box-shadow: 0 0 25px rgba(6, 182, 212, 0.7) !important;
+    filter: brightness(1.1) !important;
+}
+"""
+
+with gr.Blocks(theme=gr.themes.Monochrome(primary_hue="cyan", neutral_hue="slate"), title="Security+ Quiz Agent", css=custom_css) as demo:
+    with gr.Column(elem_classes="container"):
+        gr.HTML(
+            """
+            <div class="header-text">
+                <h1>🛡️ Security+ Quiz Agent</h1>
+                <p>Premium AI-powered assessment generation for CompTIA Security+ SY0-701</p>
+            </div>
+            """
+        )
+        
+        with gr.Row():
+            with gr.Column(scale=1, variant="panel", elem_classes="panel-custom"):
+                gr.Markdown("### ⚙️ Configuration")
+                topic_input = gr.Dropdown(
+                    choices=[
+                        "General Security Concepts",
+                        "Threats, Vulnerabilities, and Mitigations",
+                        "Security Architecture",
+                        "Security Operations",
+                        "Security Program Management and Oversight"
+                    ],
+                    value="General Security Concepts",
+                    label="SY0-701 Domain",
+                    interactive=True
+                )
+                num_questions_input = gr.Slider(
+                    minimum=1, maximum=10, step=1, value=5, 
+                    label="Number of Questions"
+                )
+                generate_btn = gr.Button("🚀 Generate Assessment", variant="primary", size="lg", elem_classes="premium-btn")
+                status_output = gr.Markdown()
+                
+            with gr.Column(scale=2, variant="panel", elem_classes="panel-custom"):
+                gr.Markdown("### 📝 Assessment Area")
+                
+                # Dynamically create radio buttons and state holders (hidden by default)
+                group_components = []
+                radio_components = []
+                state_components = []
+                
+                for i in range(MAX_QUESTIONS):
+                    with gr.Group(visible=False, elem_classes="question-card") as g:
+                        r = gr.Radio(visible=True, label="", elem_classes="question-radio")
+                    s = gr.State()
+                    group_components.append(g)
+                    radio_components.append(r)
+                    state_components.append(s)
+                    
+                submit_btn = gr.Button("✅ Submit Answers", variant="primary", size="lg", visible=False, elem_classes="premium-btn")
+                results_output = gr.Markdown()
     
     # Wire up Generation
     gen_outputs = []
     for i in range(MAX_QUESTIONS):
+        gen_outputs.append(group_components[i])
         gen_outputs.append(radio_components[i])
         gen_outputs.append(state_components[i])
     gen_outputs.append(status_output)
+    gen_outputs.append(submit_btn)
     
     generate_btn.click(
         fn=generate_quiz,
@@ -156,6 +256,4 @@ with gr.Blocks(theme=gr.themes.Soft(), title="Security+ Quick Quiz") as demo:
     )
 
 if __name__ == "__main__":
-    demo.launch(server_name="127.0.0.1", server_port=7860)
-
-    
+    demo.launch()
