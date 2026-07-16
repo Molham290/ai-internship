@@ -1,15 +1,23 @@
 import os
 import json
+import time
 import gradio as gr
 import ollama
 
 MAX_QUESTIONS = 10
 
-def generate_quiz(num_questions, topic):
+def generate_quiz(num_questions, topic, difficulty):
     if not topic.strip():
-        return [gr.update(visible=False), gr.update(), None] * MAX_QUESTIONS + ["Please enter a topic.", gr.update(visible=False)]
+        return [gr.update(visible=False), gr.update(), None] * MAX_QUESTIONS + ["Please enter a topic.", gr.update(visible=False), None]
 
-    prompt = f"""You are a cybersecurity expert. Create a Security+ certification quiz with exactly {num_questions} multiple-choice questions about '{topic}'.
+    prompt = f"You are a cybersecurity expert. Create a Security+ certification quiz with exactly {num_questions} multiple-choice questions about '{topic}'."
+    
+    if difficulty == "Hard":
+        prompt += " Make the questions highly technical and difficult."
+    elif difficulty == "Scenario-Based":
+        prompt += " Write the questions as real-world cybersecurity incident scenarios."
+        
+    prompt += """
 Respond ONLY with a valid JSON array. Do not include markdown formatting like ```json.
 The JSON format MUST be exactly:
 [
@@ -62,21 +70,22 @@ The JSON format MUST be exactly:
                 updates.append(None)
                 
         status = f"✅ Generated {len(quiz_data)} questions about '{topic}'. Select your answers and click Submit!"
-        return updates + [status, gr.update(visible=True)]
+        return updates + [status, gr.update(visible=True), time.time()]
 
     except json.JSONDecodeError:
         err_msg = f"❌ Error: Llama3 did not return valid JSON. Please try again.\n\nRaw response:\n{raw_text}"
-        return [gr.update(visible=False), gr.update(), None] * MAX_QUESTIONS + [err_msg, gr.update(visible=False)]
+        return [gr.update(visible=False), gr.update(), None] * MAX_QUESTIONS + [err_msg, gr.update(visible=False), None]
     except ollama.ResponseError as e:
         err_msg = f"❌ Ollama Model Error: {e.error}\n\nPlease ensure the 'llama3' model is pulled by running `ollama pull llama3` in your terminal."
-        return [gr.update(visible=False), gr.update(), None] * MAX_QUESTIONS + [err_msg, gr.update(visible=False)]
+        return [gr.update(visible=False), gr.update(), None] * MAX_QUESTIONS + [err_msg, gr.update(visible=False), None]
     except Exception as e:
         err_msg = f"❌ Connection Error: Could not connect to the local Ollama service.\n\nDetails: {str(e)}\n\nSteps to fix:\n1. Ensure Ollama is installed and running locally.\n2. Verify the Ollama server is active (default URL: http://localhost:11434).\n3. Try running `ollama run llama3` in your terminal."
-        return [gr.update(visible=False), gr.update(), None] * MAX_QUESTIONS + [err_msg, gr.update(visible=False)]
+        return [gr.update(visible=False), gr.update(), None] * MAX_QUESTIONS + [err_msg, gr.update(visible=False), None]
 
 def grade_quiz(*args):
     radios = args[:MAX_QUESTIONS]
-    states = args[MAX_QUESTIONS:]
+    states = args[MAX_QUESTIONS:2*MAX_QUESTIONS]
+    start_time = args[-1]
     
     score = 0
     total = 0
@@ -96,10 +105,21 @@ def grade_quiz(*args):
                 results_md.append(f"### Q{total}: ❌ Incorrect.\n**Your Answer:** {user_answer_display}  \n**Correct Answer:** {correct_answer}\n\n*Explanation:* {explanation}\n")
                 
     if total == 0:
-        return "No quiz generated yet."
+        return "No quiz generated yet.", gr.update(visible=False)
         
-    final_score = f"# 🎯 Final Score: {score} / {total}\n\n---\n\n" + "\n---\n".join(results_md)
-    return final_score
+    time_str = ""
+    if start_time:
+        elapsed = time.time() - start_time
+        mins = int(elapsed // 60)
+        secs = int(elapsed % 60)
+        time_str = f"⏱️ **Time Taken:** {mins}m {secs}s\n\n"
+        
+    final_score = f"# 🎯 Final Score: {score} / {total}\n\n{time_str}---\n\n" + "\n---\n".join(results_md)
+    
+    with open("quiz_results.md", "w", encoding="utf-8") as f:
+        f.write(final_score)
+        
+    return final_score, gr.update(value="quiz_results.md", visible=True)
 
 # Gradio Interface
 custom_css = """
@@ -207,6 +227,12 @@ with gr.Blocks(theme=gr.themes.Monochrome(primary_hue="cyan", neutral_hue="slate
                     label="SY0-701 Domain",
                     interactive=True
                 )
+                difficulty_input = gr.Dropdown(
+                    choices=["Standard", "Hard", "Scenario-Based"],
+                    value="Standard",
+                    label="Difficulty Level",
+                    interactive=True
+                )
                 num_questions_input = gr.Slider(
                     minimum=1, maximum=10, step=1, value=5, 
                     label="Number of Questions"
@@ -232,6 +258,8 @@ with gr.Blocks(theme=gr.themes.Monochrome(primary_hue="cyan", neutral_hue="slate
                     
                 submit_btn = gr.Button("✅ Submit Answers", variant="primary", size="lg", visible=False, elem_classes="premium-btn")
                 results_output = gr.Markdown()
+                download_btn = gr.DownloadButton("📥 Download Results", visible=False, elem_classes="premium-btn")
+                start_time_state = gr.State()
     
     # Wire up Generation
     gen_outputs = []
@@ -241,19 +269,22 @@ with gr.Blocks(theme=gr.themes.Monochrome(primary_hue="cyan", neutral_hue="slate
         gen_outputs.append(state_components[i])
     gen_outputs.append(status_output)
     gen_outputs.append(submit_btn)
+    gen_outputs.append(start_time_state)
     
     generate_btn.click(
         fn=generate_quiz,
-        inputs=[num_questions_input, topic_input],
+        inputs=[num_questions_input, topic_input, difficulty_input],
         outputs=gen_outputs
     )
     
     # Wire up Grading
     submit_btn.click(
         fn=grade_quiz,
-        inputs=radio_components + state_components,
-        outputs=results_output
+        inputs=radio_components + state_components + [start_time_state],
+        outputs=[results_output, download_btn]
     )
 
 if __name__ == "__main__":
     demo.launch()
+
+
