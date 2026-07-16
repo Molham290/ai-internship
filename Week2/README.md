@@ -1,20 +1,43 @@
-# 🛡️ AI-Powered Security+ Quiz Agent
+# 🛡️ AI-Powered Security+ Quiz Agent 🎯
 
-A premium, locally hosted cybersecurity assessment tool designed to generate dynamic multiple-choice questions for the **CompTIA Security+ (SY0-701)** certification exam.
+An intelligent, locally-hosted quiz generator designed specifically for CompTIA Security+ (SY0-701) exam preparation. This tool leverages the power of local LLMs to generate highly accurate, dynamic multiple-choice questions, ensuring complete data privacy and an endless supply of practice material.
 
 ## ✨ Features
-* **100% Local AI:** Powered by `Ollama` and the `llama3` model, ensuring complete data privacy and zero API costs.
-* **Dynamic Generation:** Automatically creates quizzes based on official SY0-701 domains (e.g., General Security Concepts, Threats & Vulnerabilities).
-* **Modern UI:** Built with `Gradio`, featuring a sleek, dark-mode cybersecurity aesthetic with interactive question cards.
-* **Instant Feedback:** Automated grading system providing explanations for correct and incorrect answers.
 
-## 🛠️ Prerequisites
-* Python 3.8+
-* [Ollama](https://ollama.com/) installed and running locally.
+*   **🧠 Local AI Generation:** Powered by Ollama and the `llama3` model, meaning your data never leaves your machine.
+*   **🎯 Dynamic Topic Selection:** Focus your study sessions by generating questions based on specific SY0-701 exam domains.
+*   **💻 Interactive UI:** Built with Python's Gradio framework, featuring a modern, dark-mode cybersecurity aesthetic with intuitive question cards.
+*   **⚡ Instant Feedback:** Get immediate grading and detailed explanations for every answer to accelerate your learning.
+
+## 📋 Prerequisites
+
+Before you begin, ensure you have the following installed on your system:
+*   **Python 3.x**
+*   **Ollama** (for running the local `llama3` model)
 
 ## 🚀 Installation & Setup
 
-1. **Clone the repository:**
-   ```bash
-   git clone [https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git](https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git)
-   cd YOUR_REPO_NAME
+Follow these step-by-step instructions to get the quiz agent running on your local machine:
+
+**1. Clone the repository:**
+```bash
+git clone https://github.com/yourusername/security-plus-quiz-agent.git
+cd security-plus-quiz-agent
+```
+
+**2. Install dependencies:**
+```bash
+pip install -r requirements.txt
+```
+
+**3. Pull the local AI model:**
+```bash
+ollama pull llama3
+```
+
+**4. Run the application:**
+```bash
+python QuizAgent.py
+```
+
+Once running, open the provided local URL in your web browser to start practicing!
